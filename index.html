@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="face-api.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+
+        nav {
+            background-color: #082d54;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+       
+        nav h1 {
+            margin: 0;
+        }
+
+        nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+
+        nav ul li {
+            margin-left: 20px;
+        }
+
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+        }
+
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: calc(100vh - 60px);
+            padding: 20px;
+        }
+
+        video {
+            width: 320px;
+            height: 240px;
+            border: 1px solid #000;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        table {
+            margin-top: 20px;
+            border-collapse: collapse;
+            width: 80%;
+            max-width: 600px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #082d54;
+            color: white;
+        }
+
+        p {
+            margin-top: 10px;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .info {
+            margin-top: 20px;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .info p {
+            margin-bottom: 10px;
+        }
+
+
+        /* p {
+            margin-top: 10px;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .info {
+            margin-top: 20px;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .info p {
+            margin-bottom: 10px;
+        } */
+    </style>
+</head>
+
+<body>
+    <nav>
+        <h1>Face Recognition</h1>
+        <ul>
+            <li><a href="#">Home</a></li>
+            <li><a href="register.php">Register here</a></li>
+            <li><a href="#">About</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <h1>Get data by face recognition</h1>
+
+        <video id="video" autoplay muted></video>
+        <p id="message"></p>
+
+
+        <!-- <table>
+            <thead>
+                <tr>
+                    <th>Userstd</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td>MCA</td>
+                    <td>Second year</td>
+                </tr>
+            </tbody>
+        </table> -->
+
+
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="userTable">
+
+                <tr>
+                    <td id="ch"></td>
+                    <td id="chsecond"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info">
+
+
+        </div>
+    </main>
+
+    <script>
+
+        const video = document.getElementById('video');
+        const message = document.getElementById('message');
+        const userTable = document.getElementById('userTable');
+        let userdetect = false;
+
+
+        // const video = document.getElementById('video');
+        // const message = document.getElementById('message');
+        // const userTable = document.getElementById('userTable');
+        // let userdetect = false;
+
+
+
+
+
+
+
+
+
+        
+        async function startVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+                video.srcObject = stream;
+            } catch (error) {
+                console.error("Error accessing webcam:", error);
+                message.textContent = "Unable to access webcam.";
+            }
+        }
+
+        video.addEventListener('play', async () => {
+
+
+            // await faceapi.nets.ssdMobilenetv1.loadFromUri('models');
+            // await faceapi.nets.faceRecognitionNet.loadFromUri('models');
+            // await faceapi.nets.faceLandmark68Net.loadFromUri('models');
+            // console.log("Models loaded");
+
+            await faceapi.nets.ssdMobilenetv1.loadFromUri('models');
+            await faceapi.nets.faceRecognitionNet.loadFromUri('models');
+            await faceapi.nets.faceLandmark68Net.loadFromUri('models');
+            console.log("Models loaded");
+
+            const canvas = faceapi.createCanvasFromMedia(video);
+            document.body.append(canvas);
+
+            const displaySize = { width: video.width, height: video.height };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            setInterval(async () => {
+                const detections = await faceapi
+                    .detectAllFaces(video)
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
+
+                const context = canvas.getContext("2d");
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                faceapi.draw.drawDetections(canvas, detections);
+                faceapi.draw.drawFaceLandmarks(canvas, detections);
+
+                if (detections.length > 0) {
+                    const userDescriptor = detections[0].descriptor;
+                    console.log('Face detected');
+
+
+                    const users = await fetch('get_users.php').then(res => res.json());
+                    console.log("Users fetched:", users);
+
+                    let matchFound = false;
+                    let matchedUser = null;
+
+                    users.forEach(user => {
+                        const userDescriptorArray = Object.values(user.descriptor);
+
+                        if (userDescriptorArray.length !== 128) {
+                            console.error("Invalid descriptor length:", user.username);
+                            return;
+                        }
+
+                        const distance = faceapi.euclideanDistance(userDescriptorArray, userDescriptor);
+                        let matchFound = false;
+                        const userTable = document.getElementById('userTable');
+                        console.log(distance);
+                        if (distance < 0.5) {
+                            const existingRows = userTable.getElementsByTagName('tr').length;
+                            matchFound = true;
+                            matchedUser = user.username;
+                            if (existingRows < 2) {
+                                matchFound = true;
+                                matchedUser = user.username;
+
+
+                                // const row = document.createElement('tr');
+                                // row.innerHTML = `<td>${matchedUser}</td><td>Active</td>`;
+                                // userTable.appendChild(row);
+
+                                let val = document.getElementById('ch');
+                                val.innerText = `${matchedUser}`;
+                                if(matchFound == true){
+                                       userdetect = true;
+                                }
+
+                                let val2 = document.getElementById('chsecond');
+                                val2.innerText = "Active";
+
+
+                                console.log(`Row added for user: ${matchedUser}`);
+                            } else {
+                                console.log("Maximum rows reached. Cannot append more rows.");
+                            }
+                        }
+
+
+                    });
+
+                    if (!userdetect) {
+                       
+                        message.textContent = "No match found.";
+
+                    }
+                    else {
+                        message.textContent = `Login successful! Welcome, ${matchedUser}.`;
+                       
+                        // message.textContent = `Login successful! Welcome, ${matchedUser}.`;
+                    }
+                } else {
+                    message.textContent = "No face detected.";
+                }
+            }, 100);
+        });
+
+        startVideo();
+    </script>
+</body>
+
+</html>
